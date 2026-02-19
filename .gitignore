@@ -1,0 +1,7 @@
+# Credenciais e Tokens
+tokens.py
+strava_tokens.json
+
+# Ambiente Virtual
+.venv/
+__pycache__/
