@@ -2,6 +2,9 @@ import streamlit as st
 import pandas as pd
 import os
 
+import tempfile
+from src.pipelines.fit_pipeline import process_fit_file
+
 def format_pace(speed_ms):
     '''
         Converte velocidade (m/s) para pace (min/km).
@@ -15,6 +18,41 @@ def format_pace(speed_ms):
 
     return f"{mins}:{secs:02d}"
 
+
+# RAW DATA (.FIT) - UPLOAD E PROCESSAMENTO
+st.subheader("🔬 Laboratório de Telemetria Bruta (Upload .FIT)")
+st.markdown("Faça o upload do arquivo `.fit` original do seu relógio.")
+
+arquivo_fit_upload = st.file_uploader("Arraste seu arquivo .fit aqui", type=["fit"])
+
+if arquivo_fit_upload is not None:
+    # O Streamlit precisa salvar temporariamente para o pipeline conseguir ler o caminho
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".fit") as tmp_file:
+        tmp_file.write(arquivo_fit_upload.read())
+        temp_path = tmp_file.name
+
+    with st.spinner("Executando Pipeline de Dados FIT..."):
+        # 🔥 AQUI ESTÁ A ARQUITETURA CORRETA! O Frontend chama o Pipeline.
+        df_limpo, desacoplamento_fit = process_fit_file(temp_path)
+        
+    if df_limpo is not None:
+        st.success("✅ Arquivo processado com sucesso!")
+        
+        col_A, col_B = st.columns(2)
+        with col_A:
+            if desacoplamento_fit is not None:
+                st.metric(label="Desacoplamento (Real)", value=f"{desacoplamento_fit:.2f}%")
+            else:
+                st.warning("Não foi possível calcular o desacoplamento.")
+                
+        with col_B:
+            st.metric(label="Pontos de Telemetria", value=f"{len(df_limpo)} segundos")
+            
+        with st.expander("Ver Tabela de Telemetria (Segundo a Segundo)"):
+            st.dataframe(df_limpo)
+            
+    # Limpa o arquivo temporário
+    os.remove(temp_path)
 
 st.set_page_config(page_title="RunDev Analytics", page_icon="🏃‍♀️")
 
