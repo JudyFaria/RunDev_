@@ -1,3 +1,9 @@
+# Dados
+data/raw_fits/
+data/telemetry/
+data/laps/
+data/metadata/
+
 # Credenciais e Tokens
 tokens.py
 strava_tokens.json
@@ -5,3 +11,6 @@ strava_tokens.json
 # Ambiente Virtual
 .venv/
 __pycache__/
+
+# TO-DOs e Anotações
+DO-TO.txt

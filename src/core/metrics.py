@@ -1,19 +1,31 @@
 import pandas as pd
 
-def calculate_efficiency_factor(row):
+def calculate_efficiency_factor(df):
     """
-        Calcula o Fator de Eficiência (EF).
-        EF = Velocidade (m/min) / FC (bpm).
+    Calcula o Fator de Eficiência (EF) = Velocidade (metros/minuto) / Frequência Cardíaca Média.
     """
-    hr_media = row.get('average_heartrate', 0)
+    if df is None or df.empty:
+        return None
+
+    # Aceita tanto o nome antigo (speed) quanto o novo gerado no pipeline (velocity_smooth)
+    coluna_vel = 'velocity_smooth' if 'velocity_smooth' in df.columns else 'speed'
     
-    if hr_media and hr_media > 0:
-        
-        # Converte m/s para m/min
-        velocidade_m_min = row['average_speed'] * 60
-        return velocidade_m_min / hr_media
-    
-    return None
+    if coluna_vel not in df.columns or 'heartrate' not in df.columns:
+        return None
+
+    # Calcula as médias do trecho
+    avg_speed_ms = df[coluna_vel].mean()
+    avg_hr = df['heartrate'].mean()
+
+    # Proteção contra divisões por zero ou dados ausentes
+    if pd.isna(avg_hr) or avg_hr == 0 or pd.isna(avg_speed_ms) or avg_speed_ms == 0:
+        return None
+
+    # O EF padrão na corrida é calculado usando metros por minuto
+    speed_m_min = avg_speed_ms * 60
+    ef = speed_m_min / avg_hr
+
+    return round(ef, 2)
 
 
 def calculate_decoupling(df_stream):
