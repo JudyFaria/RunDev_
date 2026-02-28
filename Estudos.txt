@@ -1,0 +1,51 @@
+Tarefa:
+    Conexão direta com o relógio (como o strava tem), para atualização instantanea das novas atividades
+
+Na engenharia, nós chamamos a isso de Event-Driven Architecture (Arquitetura Orientada a Eventos) via Webhooks. 
+Você quer que o sistema reaja automaticamente assim que o dado é gerado, sem intervenção humana.
+
+-> nós temos um bloqueio comercial (B2B)
+
+Solução:
+    vamos usar o conceito clássico de API Gateway ou Message Broker. 
+    Nós vamos usar o Strava como a nossa ponte oficial.
+
+
+    A arquitetura do seu projeto ficará assim:
+
+        - Você termina de correr.
+        
+        - O Zepp manda para o Strava (automático, como já acontece hoje).
+        
+        -O seu aplicativo RunDev conecta-se à API Pública para Desenvolvedores do Strava.
+        
+        - O RunDev "puxa" a sua telemetria segundo a segundo (GPS, BPM, Pace) direto dos servidores do Strava, 
+        processa a matemática do Clima e atualiza o seu dashboard. Fim dos uploads manuais de arquivos .fit!
+
+
+Para fazermos o seu RunDev ter essa "Sincronização Direta" e substituir de vez o upload manual do arquivo .fit, 
+nós precisamos de usar uma arquitetura baseada em Polling (Sincronização sob demanda) e um novo endpoint do Strava.
+
+
+📡 1. O Desafio do "Instantâneo" (Webhooks vs. Polling)
+O Strava possui Webhooks. Isso significa que, na teoria, assim que o Zepp manda o treino para o Strava, o Strava mandaria um "aviso" automático para o seu RunDev.
+O problema: Os Webhooks exigem que o seu aplicativo esteja hospedado num servidor público (na nuvem) 24 horas por dia para receber esse aviso. Como você está a rodar o Streamlit localmente na sua máquina para desenvolver, o Strava não consegue "bater na porta" do seu localhost.
+A Solução Elegante (Polling): Nós vamos colocar um botão grandão no topo do seu dashboard: "🔄 Sincronizar Novos Treinos". Quando você clicar, o RunDev vai perguntar ao Strava: "Qual foi o último treino da Judy?". Se for novo, ele baixa, processa a matemática toda (EF, Clima, Laps) e guarda no disco.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

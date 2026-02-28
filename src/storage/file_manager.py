@@ -43,9 +43,12 @@ def save_fit_data(temp_file_path, df_telemetry, df_laps, weather_info=None):
 
     
     # 1. copia o .fit bruto
-    fit_dest = os.path.join(RAW_DIR, f"{activity_id}.fit")
-    shutil.copy2(temp_file_path, fit_dest)
-
+    if temp_file_path and os.path.exists(temp_file_path):
+        fit_dest = os.path.join(RAW_DIR, f"{activity_id}.fit")
+        shutil.copy2(temp_file_path, fit_dest)
+    else:
+        print(f"ℹ️ Origem API detectada. Pulando cópia RAW, salvando apenas telemetria para ID: {activity_id}")
+        
     # 2. salva a telemetria 
     telemetry_dest = os.path.join(TELEMETRY_DIR, f"{activity_id}.csv")
     df_telemetry.to_csv(telemetry_dest, index=False)
