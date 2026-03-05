@@ -230,37 +230,130 @@ with tab_strava:
         df_strava = pd.read_csv(caminho_dados)
         
         if 'start_date' in df_strava.columns:
-            df_strava['start_date'] = pd.to_datetime(df_strava['start_date'])
-            df_strava = df_strava.sort_values(by='start_date', ascending=False).reset_index(drop=True)
+            df_strava['start_date'] = pd.to_datetime(df_strava['start_date']).dt.tz_localize(None)
+            
+        # ESTADO DA PAGINAÇÃO SEMANAL
+        if 'semana_offset' not in st.session_state:
+            st.session_state.semana_offset = 0 # 0 = Semana Atual
 
-        df_view = pd.DataFrame()
-
-        if 'start_date' in df_strava.columns:
-            df_view['Data'] = df_strava['start_date'].dt.strftime('%d/%m/%Y')
-
-        df_view['ID'] = df_strava['id'].astype(str)
-        df_view['Treino'] = df_strava['name']
-        df_view['Distância (km)'] = (df_strava['distance'] / 1000).round(2) 
-        df_view['Duração (min)'] = (df_strava['moving_time'] / 60).round(2)
-        df_view['Pace Médio'] = df_strava['average_speed'].apply(format_pace)
-        df_view['FC Média (bpm)'] = df_strava['average_heartrate'].round(0).astype('Int64')
-        df_view['EF'] = df_strava['efficiency_factor'].round(2)
-
-        if 'decoupling' in df_strava.columns:
-            df_view['Desacoplamento (%)'] = df_strava['decoupling'].round(2)
-        else:
-            df_view['Desacoplamento (%)'] = None
-
-        col_strava_1, col_strava_2, col_strava_3 = st.columns(3)
-        with col_strava_1:
-            st.metric("Fator de Eficiência Médio (EF)", f"{df_strava['efficiency_factor'].mean():.2f}")
-        with col_strava_2:
-            if 'decoupling' in df_strava.columns:
-                st.metric("Desacoplamento Médio", f"{df_strava['decoupling'].mean():.2f}%")
-        with col_strava_3:
-            st.metric("Volume Total (Amostra)", f"{df_view['Distância (km)'].sum():.2f} km")
+        # Cálculo das datas da semana selecionada (Segunda a Domingo)
+        hoje = pd.Timestamp.today().normalize()
+        segunda_base = hoje - pd.Timedelta(days=hoje.weekday())
         
+        data_inicio = segunda_base + pd.Timedelta(weeks=st.session_state.semana_offset)
+        data_fim = data_inicio + pd.Timedelta(days=6)
+        
+        # Filtra os dados reais do Strava para a semana selecionada
+        mask = (df_strava['start_date'].dt.date >= data_inicio.date()) & (df_strava['start_date'].dt.date <= data_fim.date())
+        df_filtrado = df_strava[mask].copy()
+
+
+        #------- semanal ---------
+        # ENGENHARIA DO GRÁFICO (7 DIAS FIXOS)
+        st.markdown("### 📈 Evolução do Volume Semanal")
+        
+        # Cria o "Esqueleto" da semana com os 7 dias
+        dias_pt = {0: 'Seg', 1: 'Ter', 2: 'Qua', 3: 'Qui', 4: 'Sex', 5: 'Sáb', 6: 'Dom'}
+        datas_semana = [data_inicio + pd.Timedelta(days=i) for i in range(7)]
+        
+        df_esqueleto = pd.DataFrame({'Data Real': [d.date() for d in datas_semana]})
+        df_esqueleto['Eixo_X'] = [f"{dias_pt[d.weekday()]}<br>{d.strftime('%d/%m')}" for d in datas_semana]
+        
+        # Agrupa os treinos do Strava por dia (caso você corra 2x no mesmo dia)
+        if not df_filtrado.empty:
+            df_filtrado['Data Real'] = df_filtrado['start_date'].dt.date
+            df_agrupado = df_filtrado.groupby('Data Real')['distance'].sum().reset_index()
+            df_agrupado['Distância (km)'] = (df_agrupado['distance'] / 1000).round(2)
+        else:
+            df_agrupado = pd.DataFrame(columns=['Data Real', 'Distância (km)'])
+            
+        # Cruza o Esqueleto com os Dados Reais (Preenche com 0 onde não tem treino)
+        df_grafico = pd.merge(df_esqueleto, df_agrupado, on='Data Real', how='left')
+        df_grafico['Distância (km)'] = df_grafico['Distância (km)'].fillna(0)
+
+        # Renderiza o Gráfico
+        fig_vol = px.bar(
+            df_grafico, 
+            x='Eixo_X', 
+            y='Distância (km)',
+            text='Distância (km)',
+            color_discrete_sequence=['#FC4C02'] 
+        )
+        
+        # Formatação - Oculta o texto "0" nas barras vazias para ficar limpo
+        fig_vol.update_traces(
+            textposition='outside',
+            textfont_size=14,
+            texttemplate='%{text:.2f}',
+            cliponaxis=False
+        )
+        # Esconde o label "0.00" nos dias de descanso
+        fig_vol.for_each_trace(lambda t: t.update(text=[str(v) if v > 0 else "" for v in t.y]))
+        
+        fig_vol.update_layout(
+            xaxis_title="",
+            yaxis_title="Volume Diário (km)",
+            xaxis={'type': 'category'}, # Trava os 7 espaços independentemente do volume
+            plot_bgcolor='rgba(0,0,0,0)',
+            margin=dict(t=10, l=10, r=10, b=10),
+            height=320
+        )
+        
+        st.plotly_chart(fig_vol, use_container_width=True)
+
+        # BOTÕES DE NAVEGAÇÃO (Abaixo do Gráfico)
+        col_esq, col_meio, col_dir = st.columns([1, 4, 1])
+        
+        with col_esq:
+            if st.button("⬅️ Anterior", use_container_width=True):
+                st.session_state.semana_offset -= 1
+                st.rerun()
+                
+        with col_meio:
+            label_data = f"{data_inicio.strftime('%d/%m')} a {data_fim.strftime('%d/%m/%Y')}"
+            st.markdown(f"<h4 style='text-align: center; color: #666; margin-top: 5px;'>Semana: {label_data}</h4>", unsafe_allow_html=True)
+            
+        with col_dir:
+            # O botão de "Próximo" ou "Voltar a Hoje"
+            if st.session_state.semana_offset < 0:
+                if st.button("Próximo ➡️", use_container_width=True):
+                    st.session_state.semana_offset += 1
+                    st.rerun()
+            else:
+                st.button("Atual 🎯", disabled=True, use_container_width=True)
+
         st.divider()
-        st.dataframe(df_view, hide_index=True, use_container_width=True)
+
+        # MÉTRICAS GLOBAIS DA SEMANA E TABELA
+        if not df_filtrado.empty:
+            df_filtrado = df_filtrado.sort_values(by='start_date', ascending=False).reset_index(drop=True)
+            
+            df_view = pd.DataFrame()
+            if 'start_date' in df_filtrado.columns:
+                df_view['Data'] = df_filtrado['start_date'].dt.strftime('%d/%m/%Y')
+                
+            df_view['Treino'] = df_filtrado['name']
+            df_view['Distância (km)'] = (df_filtrado['distance'] / 1000).round(2) 
+            df_view['Duração (min)'] = (df_filtrado['moving_time'] / 60).round(2)
+            df_view['Pace Médio'] = df_filtrado['average_speed'].apply(format_pace)
+            df_view['FC Média (bpm)'] = df_filtrado['average_heartrate'].round(0).astype('Int64')
+            df_view['EF'] = df_filtrado['efficiency_factor'].round(2)
+
+            col_strava_1, col_strava_2, col_strava_3 = st.columns(3)
+            with col_strava_1:
+                ef_medio = df_filtrado['efficiency_factor'].mean()
+                st.metric("Fator de Eficiência (EF)", f"{ef_medio:.2f}" if not pd.isna(ef_medio) else "N/A")
+            with col_strava_2:
+                if 'decoupling' in df_filtrado.columns:
+                    dec_medio = df_filtrado['decoupling'].mean()
+                    st.metric("Desacoplamento Médio", f"{dec_medio:.2f}%" if not pd.isna(dec_medio) else "N/A")
+                else:
+                    st.metric("Desacoplamento Médio", "N/A")
+            with col_strava_3:
+                st.metric("Volume da Semana", f"{df_view['Distância (km)'].sum():.2f} km")
+            
+            st.dataframe(df_view, hide_index=True, use_container_width=True)
+        else:
+            st.info("Você não registrou nenhum treino nesta semana.")
     else:
         st.info("Arquivo de histórico do Strava não encontrado. Clique em Sincronizar na barra lateral.")
