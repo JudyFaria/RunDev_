@@ -4,11 +4,12 @@ import json, os, time
 
 import streamlit as st
 # puxa as credenciais com segurança do cofre do streamlit
-CLIENT_ID = st.secrets["client_id"]
-CLIENT_SECRET = st.secrets["client_secret"]
-ACCESS_TOKEN = st.secrets["access_token"]
-UPDATE_TOKEN = st.secrets["update_tokens"]
+# CLIENT_ID = st.secrets["client_id"]
+# CLIENT_SECRET = st.secrets["client_secret"]
+# ACCESS_TOKEN = st.secrets["access_token"]
+# UPDATE_TOKEN = st.secrets["update_tokens"]
 
+import tokens
 TOKEN_FILE = 'strava_tokens.json'
 
 def save_tokens(token_data):
@@ -31,8 +32,8 @@ def refresh_access_token(saved_tokens):
     print("🔄 Refreshing access token...")
     token_url = "https://www.strava.com/oauth/token"
     payload = {
-        'client_id': CLIENT_ID,
-        'client_secret': CLIENT_SECRET,
+        'client_id': tokens.client_id,
+        'client_secret': tokens.client_secret,
         'refresh_token': saved_tokens['refresh_token'],
         'grant_type': 'refresh_token'
     }
@@ -65,7 +66,7 @@ def get_valid_access_token():
     if not saved_tokens:
         print("Nenhum token encontrado. Abrindo navegador para autorização...")
         auth_url = (
-            f"https://www.strava.com/oauth/authorize?client_id={CLIENT_ID}"
+            f"https://www.strava.com/oauth/authorize?client_id={tokens.client_id}"
             f"&response_type=code&redirect_uri=http://localhost/&scope=activity:read_all"
         )
         webbrowser.open(auth_url)
@@ -73,8 +74,8 @@ def get_valid_access_token():
 
         token_url = "https://www.strava.com/oauth/token"
         payload = {
-            'client_id': CLIENT_ID,
-            'client_secret': CLIENT_SECRET,
+            'client_id': tokens.client_id,
+            'client_secret': tokens.client_secret,
             'code': authorization_code,
             'grant_type': 'authorization_code'
         }
