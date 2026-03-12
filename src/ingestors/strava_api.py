@@ -101,7 +101,7 @@ def get_valid_access_token():
 
 def get_recent_activities(limit=5):
     """
-        Obtém o resumo das últimas atividades (apenas corridas).
+        Obtém o resumo das últimas atividades.
     """
     access_token = get_valid_access_token()
     activities_url = "https://www.strava.com/api/v3/athlete/activities"
@@ -113,9 +113,12 @@ def get_recent_activities(limit=5):
         response.raise_for_status()
         data = response.json()
         
-        # Filtra apenas por corridas
-        runs = [act for act in data if act.get('type') == 'Run']
-        return runs
+        # # Filtra apenas por corridas
+        # runs = [act for act in data if act.get('type') == 'Run']
+        # return runs
+
+        activities = [act for act in data]
+        return activities
     
     except Exception as e:
         print(f"❌ Erro ao obter atividades: {e}")

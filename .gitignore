@@ -4,6 +4,11 @@ data/telemetry/
 data/laps/
 data/metadata/
 
+# Bancos de Dados locias
+data/*.db
+*.sqlite
+*.sqlite3
+
 # Credenciais e Tokens
 tokens.py
 strava_tokens.json
