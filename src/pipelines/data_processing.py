@@ -14,7 +14,7 @@ def sync_strava_to_app():
     print("🔄 Sincronização Inteligente Iniciada...")
 
     # Puxa os treinos recentes do Strava
-    activities = get_recent_activities(limit=1000)
+    activities = get_recent_activities(limit=200)
 
     if not activities:
         return 0 # 0 novos treinos
